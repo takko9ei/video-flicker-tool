@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import VideoCropper from './components/VideoCropper';
-import ObjectPlaceholderAnalysis from './components/FlickerAnalysis'; // wait
+import VideoCropper from './components/VideoCropper.tsx';
+import ObjectPlaceholderAnalysis from './components/FlickerAnalysis.tsx';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'cropper' | 'flicker'>('cropper');
@@ -29,6 +29,10 @@ export default function App() {
         {activeTab === 'cropper' && <VideoCropper />}
         {activeTab === 'flicker' && <ObjectPlaceholderAnalysis />}
       </main>
+      
+      <footer className="author-footer">
+        © 2026 takko9ei
+      </footer>
     </div>
   );
 }

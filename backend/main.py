@@ -143,6 +143,48 @@ async def process_video(req: ProcessRequest):
     
     return {"message": "Success", "output_file": output_filename, "path": output_path}
 
+class AnalyzeRequest(BaseModel):
+    filename: str
+
+@app.post("/analyze")
+async def analyze_video(req: AnalyzeRequest):
+    input_path = os.path.join(UPLOAD_DIR, req.filename)
+    if not os.path.exists(input_path):
+        raise HTTPException(status_code=404, detail="Video not found")
+        
+    cap = cv2.VideoCapture(input_path)
+    if not cap.isOpened():
+        raise HTTPException(status_code=400, detail="Could not open video file")
+        
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    
+    data = []
+    current_frame = 0
+    
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+            
+        # Convert to grayscale
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # Calculate mean pixel intensity
+        mean_val = gray.mean()
+        
+        data.append({"frame": current_frame, "intensity": round(mean_val, 2)})
+        current_frame += 1
+        
+    cap.release()
+    
+    return {
+        "filename": req.filename,
+        "fps": fps,
+        "total_frames": total_frames,
+        "data": data
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+

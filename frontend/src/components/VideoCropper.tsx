@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import FrameScrubber from './common/FrameScrubber';
 import type { BoundingBox } from './common/FrameScrubber';
 
 export default function VideoCropper() {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [videoInfo, setVideoInfo] = useState<{
@@ -120,7 +121,24 @@ export default function VideoCropper() {
           <p className="text-muted" style={{ marginBottom: '1.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>
             Start by uploading an MP4 file to begin processing.
           </p>
-          <input type="file" accept="video/mp4" onChange={handleFileChange} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+            <input 
+              type="file" 
+              accept="video/mp4" 
+              onChange={handleFileChange}
+              ref={fileInputRef}
+              style={{ display: 'none' }}
+            />
+            <button 
+              className="btn btn-sm" 
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Select File
+            </button>
+            <span style={{ fontWeight: 700, color: 'var(--text-main)', fontSize: '0.95rem' }}>
+              {file ? file.name : "No file chosen"}
+            </span>
+          </div>
           <button className="btn" onClick={handleUpload} disabled={isUploading || !file}>
             {isUploading ? 'Uploading...' : 'Upload & Initialize'}
           </button>
