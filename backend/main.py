@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import math
-
+import numpy as np
 app = FastAPI(title="Video Flicker Tool API")
 
 app.add_middleware(
@@ -198,6 +198,7 @@ async def analyze_video(req: AnalyzeRequest):
     
     data = []
     current_frame = 0
+    raw_intensities = []
     
     while True:
         ret, frame = cap.read()
@@ -210,15 +211,40 @@ async def analyze_video(req: AnalyzeRequest):
         mean_val = gray.mean()
         
         data.append({"frame": current_frame, "intensity": round(mean_val, 2)})
+        raw_intensities.append(mean_val)
         current_frame += 1
         
     cap.release()
+    
+    # Fourier Analysis
+    fourier_data = {"A0": 0.0, "harmonics": []}
+    if len(raw_intensities) > 1:
+        y = np.array(raw_intensities)
+        L = len(y)
+        # Linear Detrending to ensure seamless looping (y[0] == y[-1] in the smoothed version)
+        # We subtract a line that goes from 0 to (y[-1] - y[0])
+        trend = np.linspace(0, y[-1] - y[0], L)
+        y_smooth = y - trend
+        
+        # Calculate FFT on the smoothed signal
+        coeffs = np.fft.rfft(y_smooth)
+        
+        # A0 = average offset
+        A0 = float(coeffs[0].real / L)
+        fourier_data["A0"] = A0
+        
+        # Get up to 50 harmonics
+        for n in range(1, min(51, len(coeffs))):
+            a_n = float(2 * coeffs[n].real / L)
+            b_n = float(-2 * coeffs[n].imag / L)
+            fourier_data["harmonics"].append({"n": n, "a": a_n, "b": b_n})
     
     return {
         "filename": req.filename,
         "fps": fps,
         "total_frames": total_frames,
-        "data": data
+        "data": data,
+        "fourier": fourier_data
     }
 
 if __name__ == "__main__":

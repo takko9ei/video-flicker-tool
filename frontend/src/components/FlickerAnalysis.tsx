@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 export default function FlickerAnalysis() {
@@ -18,7 +18,14 @@ export default function FlickerAnalysis() {
     fps: number;
     total_frames: number;
     data: { frame: number; intensity: number }[];
+    fourier?: {
+      A0: number;
+      harmonics: { n: number; a: number; b: number }[];
+    };
   } | null>(null);
+  
+  const [harmonicsN, setHarmonicsN] = useState<number>(10);
+  const [amplitudeScale, setAmplitudeScale] = useState<number>(1.0);
   
   const [syncFrame, setSyncFrame] = useState(0);
 
@@ -96,6 +103,53 @@ export default function FlickerAnalysis() {
     }
   }
 
+  const chartData = useMemo(() => {
+    if (!analysisData) return [];
+    
+    if (!analysisData.fourier) {
+      return analysisData.data;
+    }
+
+    const { A0, harmonics } = analysisData.fourier;
+    const w = (2 * Math.PI) / analysisData.total_frames;
+
+    return analysisData.data.map(d => {
+      let fitted = A0;
+      for (let i = 0; i < harmonicsN; i++) {
+        const h = harmonics[i];
+        if (!h) break;
+        fitted += h.a * Math.cos(h.n * w * d.frame) + h.b * Math.sin(h.n * w * d.frame);
+      }
+      fitted *= amplitudeScale;
+      return { ...d, fitted };
+    });
+  }, [analysisData, harmonicsN, amplitudeScale]);
+
+  const generateMotionScript = () => {
+    if (!analysisData?.fourier) return;
+    
+    const L = analysisData.total_frames;
+    const w = (2 * Math.PI) / L;
+    let script = `// Auto-generated Fourier Motion Script\n`;
+    script += `// Seamless Looping: N (Harmonics) = ${harmonicsN}, Scale = ${amplitudeScale}\n\n`;
+    script += `float w = ${w.toFixed(6)}f;\n`;
+    script += `float t = Time.time * ${analysisData.fps.toFixed(2)}f; // Replace with your driving time/frame variable\n\n`;
+    script += `float offset = ${analysisData.fourier.A0.toFixed(4)}f;\n`;
+    
+    for(let i=0; i<harmonicsN; i++) {
+      const h = analysisData.fourier.harmonics[i];
+      if (!h) break;
+      script += `offset += ${h.a.toFixed(4)}f * Mathf.Cos(${h.n} * w * t) + ${h.b.toFixed(4)}f * Mathf.Sin(${h.n} * w * t);\n`;
+    }
+    script += `\noffset *= ${amplitudeScale.toFixed(4)}f;\n`;
+    
+    // Example usage for Unity
+    script += `// transform.localPosition = new Vector3(transform.localPosition.x, offset, transform.localPosition.z);\n`;
+
+    navigator.clipboard.writeText(script);
+    alert("Motion script copied to clipboard!");
+  };
+
   return (
     <div className="panel">
       {!videoInfo ? (
@@ -151,7 +205,7 @@ export default function FlickerAnalysis() {
             {analysisData ? (
                <ResponsiveContainer width="100%" height="100%">
                  {/* onMouseMove handles clicking/scrubbing backwards from chart to video! */}
-                 <LineChart data={analysisData.data} onClick={syncHover}>
+                 <LineChart data={chartData} onClick={syncHover}>
                    <XAxis 
                      dataKey="frame" 
                      stroke="var(--text-main)" 
@@ -180,6 +234,14 @@ export default function FlickerAnalysis() {
                      dot={false}
                      isAnimationActive={false} 
                    />
+                   <Line 
+                     type="monotone" 
+                     dataKey="fitted" 
+                     stroke="#ff00ff" 
+                     strokeWidth={2}
+                     dot={false}
+                     isAnimationActive={false} 
+                   />
                    {/* This vertical cursor moves synchronously with the video */}
                    <ReferenceLine 
                      x={syncFrame} 
@@ -194,6 +256,43 @@ export default function FlickerAnalysis() {
                </div>
             )}
           </div>
+          
+          {analysisData?.fourier && (
+            <div style={{ padding: '1.5rem', backgroundColor: 'var(--panel-bg)', borderRadius: '4px', border: 'var(--thick-border)' }}>
+              <h3 style={{ marginBottom: '1rem', fontSize: '1.2rem', fontWeight: 800 }}>Fourier Synthesis Controls</h3>
+              <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, minWidth: '200px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <label style={{ fontWeight: 700 }}>Harmonics (N)</label>
+                    <span style={{ fontWeight: 800, color: 'var(--primary)' }}>{harmonicsN}</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="1" max="50" step="1" 
+                    value={harmonicsN} 
+                    onChange={e => setHarmonicsN(Number(e.target.value))}
+                    style={{ width: '100%', cursor: 'pointer' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, minWidth: '200px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <label style={{ fontWeight: 700 }}>Amplitude Scale</label>
+                    <span style={{ fontWeight: 800, color: '#ff00ff' }}>{amplitudeScale.toFixed(1)}x</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min="0.1" max="5.0" step="0.1" 
+                    value={amplitudeScale} 
+                    onChange={e => setAmplitudeScale(Number(e.target.value))}
+                    style={{ width: '100%', cursor: 'pointer' }}
+                  />
+                </div>
+                <button className="btn accent" onClick={generateMotionScript}>
+                  Copy Motion Script (C#)
+                </button>
+              </div>
+            </div>
+          )}
           
         </div>
       )}
