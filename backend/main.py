@@ -111,13 +111,34 @@ async def process_video(req: ProcessRequest):
     name, ext = os.path.splitext(req.filename)
     output_filename = f"{name}_cropped_{req.start_frame}_{req.end_frame}{ext}"
     output_path = os.path.join(UPLOAD_DIR, output_filename)
+    temp_path = os.path.join(UPLOAD_DIR, "temp_" + output_filename)
     
     cap = cv2.VideoCapture(input_path)
     fps = cap.get(cv2.CAP_PROP_FPS)
+
+    # User requested logic: if max edge < 256, set short edge to 256 and scale long edge proportionally
+    out_w = req.width
+    out_h = req.height
     
-    # Setup Video Writer
-    fourcc = cv2.VideoWriter_fourcc(*'avc1') # typical fallback, or mp4v
-    out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (req.width, req.height))
+    if req.width > 0 and req.height > 0:
+        max_edge = max(req.width, req.height)
+        min_edge = min(req.width, req.height)
+        
+        if max_edge < 256:
+            scale_factor = 256.0 / min_edge
+            if req.width <= req.height:
+                out_w = 256
+                out_h = int(req.height * scale_factor)
+            else:
+                out_h = 256
+                out_w = int(req.width * scale_factor)
+
+    # Force even dimensions for strictly compliant H.264 Web encoding
+    out_w = int((out_w + 1) // 2 * 2)
+    out_h = int((out_h + 1) // 2 * 2)
+
+    # Setup Video Writer (writing to a temporary file first)
+    out = cv2.VideoWriter(temp_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (out_w, out_h))
     
     # Seek to start frame
     cap.set(cv2.CAP_PROP_POS_FRAMES, req.start_frame)
@@ -130,6 +151,11 @@ async def process_video(req: ProcessRequest):
             
         # Crop frame to bounding box [y:y+h, x:x+w]
         cropped = frame[req.y : req.y + req.height, req.x : req.x + req.width]
+        
+        # Apply scaling if dimensions were adjusted
+        if out_w != req.width or out_h != req.height:
+            cropped = cv2.resize(cropped, (out_w, out_h), interpolation=cv2.INTER_NEAREST)
+            
         out.write(cropped)
         
         current_frame += 1
@@ -137,9 +163,20 @@ async def process_video(req: ProcessRequest):
     cap.release()
     out.release()
     
-    # Note: OpenCV's mp4v writer might not be viewable natively in all browsers
-    # To fix this, you might need to transcode with ffmpeg if browser playback is required.
-    # For now, it outputs standard mp4 file perfectly readable by desktop video players.
+    # Transcode the mp4v encoding to browser-friendly H.264 using FFmpeg (requires FFmpeg on system PATH)
+    import subprocess
+    target_path = output_path
+    
+    try:
+        subprocess.run([
+            'ffmpeg', '-y', '-i', temp_path, 
+            '-c:v', 'libx264', '-crf', '18', '-g', '1', '-pix_fmt', 'yuv420p', 
+            target_path
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    finally:
+        # Cleanup temporary opencv file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
     
     return {"message": "Success", "output_file": output_filename, "path": output_path}
 
