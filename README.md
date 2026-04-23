@@ -2,6 +2,7 @@
 
 ### Screenshot | スクリーンショット | 项目截图
 <img width="1372" height="1648" alt="image" src="https://github.com/user-attachments/assets/da61fb99-0544-4e20-b52b-f8c69fedb4ff" />
+---
 
 [English](#english) | [日本語](#日本語) | [中文](#中文)
 
