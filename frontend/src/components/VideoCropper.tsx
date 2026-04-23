@@ -101,7 +101,15 @@ export default function VideoCropper() {
 
       const data = await response.json();
       if (response.ok) {
-        setProcessResult(`Success! Saved to ${data.path}`);
+        setProcessResult(`Success! The cropped video is downloading...`);
+        
+        // Trigger browser download of the cropped file
+        const a = document.createElement('a');
+        a.href = `/api/video/${data.output_file}`;
+        a.download = data.output_file;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       } else {
         alert("Processing failed: " + JSON.stringify(data));
       }

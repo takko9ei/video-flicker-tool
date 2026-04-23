@@ -54,6 +54,18 @@ body {
   padding: 0.5rem 1rem;
   border: var(--thick-border);
   box-shadow: 4px 4px 0px #000;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.header h1:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0px #000;
+}
+
+.header h1:active {
+  transform: translate(4px, 4px);
+  box-shadow: none;
 }
 
 .tabs {

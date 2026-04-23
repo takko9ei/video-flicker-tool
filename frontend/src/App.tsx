@@ -8,7 +8,7 @@ export default function App() {
   return (
     <div className="app-container">
       <header className="header">
-        <h1>Video Flicker Tool</h1>
+        <h1 onClick={() => window.location.reload()}>Video Flicker Tool</h1>
         <div className="tabs">
           <button 
             className={`tab-btn ${activeTab === 'cropper' ? 'active' : ''}`}

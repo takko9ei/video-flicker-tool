@@ -35,6 +35,8 @@ This project is a web application designed to analyze pixel intensity changes in
    - The application will calculate the mean pixel intensity per frame and display the waveform.
    - Adjust the n-th order Fourier series parameters to fit the waveform. The calculation implements logic to ensure the generated Fourier series forms a continuous, seamless loop.
    - Copy the generated Fourier series script for external usage.
+   
+   *Note: Uploaded and cropped videos will be copied and stored in the backend's `uploads` directory. If necessary, please open the folder and clean it up manually.*
 
 ---
 
@@ -65,6 +67,8 @@ This project is a web application designed to analyze pixel intensity changes in
    - n次フーリエ級数のパラメータを調整して波形にフィッティングさせます。このフーリエ級数は、始点と終点が繋がり連続したループ再生が可能になるように計算されています。
    - 生成されたフーリエ級数のスクリプトをコピーして外部で利用できます。
 
+   *注意: アップロードおよびクロップされた動画はバックエンドの `uploads` ディレクトリにコピーして保存されます。必要に応じてディレクトリを開き、手動でクリーンアップしてください。*
+
 ---
 
 <h2 id="中文">中文</h2>
@@ -93,3 +97,5 @@ This project is a web application designed to analyze pixel intensity changes in
    - 应用程序将计算每一帧的平均像素亮度并显示为波形。
    - 调整 n 阶傅里叶级数参数对波形进行拟合。该傅里叶级数实现了首尾相连的逻辑，便于循环播放。
    - 复制生成的傅里叶级数脚本以供外部使用。
+
+   *注意：点击上传的视频会复制一份存在后端 `backend/uploads` 文件夹下，如果有需要请打开文件夹自行清理。*

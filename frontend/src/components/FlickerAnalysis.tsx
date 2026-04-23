@@ -104,9 +104,9 @@ export default function FlickerAnalysis() {
     }
   }
 
-  const chartData = useMemo(() => {
-    if (!analysisData) return [];
-    
+  const metrics = useMemo(() => {
+    if (!analysisData) return null;
+
     let sumInt = 0;
     let minInt = Infinity;
     let maxInt = -Infinity;
@@ -121,6 +121,38 @@ export default function FlickerAnalysis() {
     if (minInt === maxInt) maxInt = minInt + 1;
 
     if (!analysisData.fourier) {
+      return { intensityMean, minInt, maxInt, acValues: [], minAC: -1, maxAC: 1 };
+    }
+
+    const { harmonics } = analysisData.fourier;
+    const w = (2 * Math.PI) / analysisData.total_frames;
+
+    let minAC = Infinity;
+    let maxAC = -Infinity;
+    
+    const acValues = analysisData.data.map(d => {
+      let ac = 0;
+      for (let i = 0; i < harmonicsN; i++) {
+        const h = harmonics[i];
+        if (!h) break;
+        ac += h.a * Math.cos(h.n * w * d.frame) + h.b * Math.sin(h.n * w * d.frame);
+      }
+      if (ac < minAC) minAC = ac;
+      if (ac > maxAC) maxAC = ac;
+      return ac;
+    });
+
+    if (minAC === maxAC) maxAC = minAC + 1;
+
+    return { intensityMean, minInt, maxInt, acValues, minAC, maxAC };
+  }, [analysisData, harmonicsN]);
+
+  const chartData = useMemo(() => {
+    if (!analysisData || !metrics) return [];
+
+    const { intensityMean, minInt, maxInt, acValues, minAC, maxAC } = metrics;
+
+    if (!analysisData.fourier) {
       if (displayMode === 'relative') {
         return analysisData.data.map(d => ({
           ...d,
@@ -129,28 +161,6 @@ export default function FlickerAnalysis() {
       }
       return analysisData.data;
     }
-
-    const { harmonics } = analysisData.fourier;
-    const w = (2 * Math.PI) / analysisData.total_frames;
-
-    // Pre-calculate AC for min/max
-    const acValues = analysisData.data.map(d => {
-      let ac = 0;
-      for (let i = 0; i < harmonicsN; i++) {
-        const h = harmonics[i];
-        if (!h) break;
-        ac += h.a * Math.cos(h.n * w * d.frame) + h.b * Math.sin(h.n * w * d.frame);
-      }
-      return ac;
-    });
-
-    let minAC = Infinity;
-    let maxAC = -Infinity;
-    acValues.forEach(ac => {
-      if (ac < minAC) minAC = ac;
-      if (ac > maxAC) maxAC = ac;
-    });
-    if (minAC === maxAC) maxAC = minAC + 1;
 
     return analysisData.data.map((d, idx) => {
       const ac = acValues[idx];
@@ -168,38 +178,14 @@ export default function FlickerAnalysis() {
 
       return { ...d, intensity: finalIntensity, fitted: finalFitted };
     });
-  }, [analysisData, harmonicsN, amplitudeScale, displayMode]);
+  }, [analysisData, metrics, amplitudeScale, displayMode]);
 
   const generateMotionScript = () => {
-    if (!analysisData?.fourier) return;
+    if (!analysisData?.fourier || !metrics) return;
     
-    let sumInt = 0;
-    let minInt = Infinity;
-    let maxInt = -Infinity;
-    let minAC = Infinity;
-    let maxAC = -Infinity;
-
+    const { intensityMean, minAC, maxAC } = metrics;
     const L = analysisData.total_frames;
     const w = (2 * Math.PI) / L;
-
-    analysisData.data.forEach(d => {
-      sumInt += d.intensity;
-      if (d.intensity < minInt) minInt = d.intensity;
-      if (d.intensity > maxInt) maxInt = d.intensity;
-
-      let ac = 0;
-      for (let i = 0; i < harmonicsN; i++) {
-        const h = analysisData.fourier.harmonics[i];
-        if (!h) break;
-        ac += h.a * Math.cos(h.n * w * d.frame) + h.b * Math.sin(h.n * w * d.frame);
-      }
-      if (ac < minAC) minAC = ac;
-      if (ac > maxAC) maxAC = ac;
-    });
-
-    const intensityMean = sumInt / analysisData.data.length;
-    if (minInt === maxInt) maxInt = minInt + 1;
-    if (minAC === maxAC) maxAC = minAC + 1;
 
     let script = `// Auto-generated Fourier Motion Script\n`;
     script += `// Seamless Looping: N (Harmonics) = ${harmonicsN}, Scale = ${amplitudeScale}\n`;
@@ -238,7 +224,7 @@ export default function FlickerAnalysis() {
       {!videoInfo ? (
         <div className="upload-section">
           <h2>Flicker Analysis Tracker</h2>
-          <p className="text-muted" style={{ marginBottom: '1.5rem', fontWeight: 600 }}>
+          <p className="text-muted" style={{ marginBottom: '1.5rem', color: 'var(--text-muted)', fontWeight: 600 }}>
             Upload a cropped video to generate a pixel intensity time-series chart.
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
